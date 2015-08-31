@@ -4,7 +4,7 @@ source = {
     url = "git://github.com/mah0x211/lua-reco.git"
 }
 description = {
-    summary = "coroutine module",
+    summary = "reusable coroutine module",
     homepage = "https://github.com/mah0x211/lua-reco",
     license = "MIT",
     maintainer = "Masatoshi Teruya"
