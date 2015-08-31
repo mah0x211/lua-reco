@@ -138,16 +138,6 @@ static int call_lua( lua_State *L )
 }
 
 
-static int len_lua( lua_State *L )
-{
-    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
-
-    lua_pushinteger( L, c->narg );
-    
-    return 1;
-}
-
-
 static int tostring_lua( lua_State *L )
 {
     lua_pushfstring( L, MODULE_MT ": %p", luaL_checkudata( L, 1, MODULE_MT ) );
@@ -225,7 +215,6 @@ LUALIB_API int luaopen_reco( lua_State *L )
     struct luaL_Reg mmethod[] = {
         { "__gc", gc_lua },
         { "__tostring", tostring_lua },
-        { "__len", len_lua },
         { "__call", call_lua },
         { NULL, NULL }
     };
