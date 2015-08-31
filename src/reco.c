@@ -27,19 +27,13 @@
 
 
 #include <unistd.h>
-#include <stddef.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdint.h>
 // lua
 #include <lua.h>
 #include <lauxlib.h>
 
-
-// memory alloc/dealloc
-#define pnalloc(n,t)    (t*)malloc( (n) * sizeof(t) )
-#define pdealloc(p)     free((void*)p)
 
 // helper macros for lua_State
 #define lstate_ref(L) \
@@ -72,69 +66,75 @@ typedef struct {
 static int call_lua( lua_State *L )
 {
     reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
-    int argc = lua_gettop( L );
+    int argc = lua_gettop( L ) - 1;
     lua_State *th = c->L;
     int *args = c->args;
     int narg = c->narg;
     int status = c->status;
     int i = 0;
     
-    // re-create thread
+    // should create new thread
     if( !th )
     {
+        // failed to create new thread
         if( !( th = lua_newthread( L ) ) ){
             lua_pushinteger( L, LUA_ERRMEM );
             lua_pushstring( L, strerror( errno ) );
             return 2;
         }
+        // retain thread
+        args[narg] = lstate_ref( L );
         c->L = th;
     }
-
-    
-    if( status == LUA_YIELD ){
-        i = 1;
-        narg -= 1;
+    // skip function if yield
+    else {
+        i += status == LUA_YIELD;
     }
     
     // push func and arguments
     for(; i < narg; i++ ){
         lstate_pushref( th, args[i] );
     }
-    // move args to th
-    lua_xmove( L, th, argc );
-    narg = narg - 1 + argc;
+    // move args to thread
+    if( argc ){
+        lua_xmove( L, th, argc );
+    }
+    narg = i - 1 + argc;
     
-    // run on coroutine
+    // run thread
 #if LUA_VERSION_NUM >= 502
     status = lua_resume( th, L, narg );
 #else
     status = lua_resume( th, narg );
 #endif
-    lua_pushinteger( L, status );
+    // update status
+    c->status = status;
+    
     switch( status )
     {
         case 0:
         case LUA_YIELD:
-            lua_xmove( th, L, lua_gettop( th ) );
-        break;
+            lua_pushboolean( L, 1 );
+            narg = lua_gettop( th );
+            lua_xmove( th, L, narg );
+            return 1 + narg;
         
+        // got error
         // LUA_ERRMEM:
         // LUA_ERRERR:
         // LUA_ERRSYNTAX:
         // LUA_ERRRUN:
         default:
+            lua_pushboolean( L, 0 );
             lua_xmove( th, L, 1 );
             // re-create thread
-            if( !( c->L = lua_newthread( L ) ) ){
-                lua_pushstring( L, strerror( errno ) );
+            if( ( c->L = lua_newthread( L ) ) ){
+                // retain thread
+                args[narg] = lstate_ref( L );
             }
-        break;
+            
+            return 2;
     }
-    
-    // update status
-    c->status = status;
-    
-    return 0;
 }
 
 
@@ -159,12 +159,14 @@ static int tostring_lua( lua_State *L )
 static int gc_lua( lua_State *L )
 {
     reco_t *c = (reco_t*)lua_touserdata( L, 1 );
+    int narg = c->narg + 1;
     int i = 0;
     
-    for(; i < c->narg; i++ ){
+    // release references
+    for(; i < narg; i++ ){
         lstate_unref( L, c->args[i] );
     }
-    pdealloc( c->args );
+    free( (void*)c->args );
     
     return 0;
 }
@@ -173,25 +175,36 @@ static int gc_lua( lua_State *L )
 static int new_lua( lua_State *L )
 {
     int narg = lua_gettop( L );
-    reco_t *c = lua_newuserdata( L, sizeof( reco_t ) );
+    lua_State *th = NULL;
+    reco_t *c = NULL;
     int *args = NULL;
     
     // check fisrt argument
     luaL_checktype( L, 1, LUA_TFUNCTION );
-    
-    if( c && 
-        ( c->L = lua_newthread( L ) ) && 
-        ( args = pnalloc( narg, int ) ) )
+    // alloc
+    if( ( th = lua_newthread( L ) ) &&
+        ( c = lua_newuserdata( L, sizeof( reco_t ) ) ) &&
+        // narg(fn + other arguments) + thread
+        ( args = (int*)malloc( ( narg + 1 ) * sizeof( int ) ) ) )
     {
+        // temporary retain userdata
+        int ref = lstate_ref( L );
         int i = narg;
         
+        // retain thread
+        args[narg] = lstate_ref( L );
         // retain args
         for(; i > 0; i-- ){
             args[i - 1] = lstate_ref( L );
         }
         
+        c->L = th;
+        c->status = 0;
         c->narg = narg;
         c->args = args;
+        // push and release userdata
+        lstate_pushref( L, ref );
+        lstate_unref( L, ref );
         // set metatable
         luaL_getmetatable( L, MODULE_MT );
         lua_setmetatable( L, -2 );
