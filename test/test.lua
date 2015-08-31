@@ -1,13 +1,28 @@
+local reco = require('reco');
 
-local function sample()
+local function myfn( ... )
+    print( 'args', ... );
+    coroutine.yield( 'a', 'b', 'c' );
     print 'ok';
+    
+    return ...;
 end
 
-local co = coroutine.create( sample );
-print( coroutine.resume( co ) );
-print( coroutine.resume( co ) );
+local args = { 'x', 'y', 'z' };
 
-co = coroutine.wrap( sample );
-print( co() );
-print( co() );
+print('Coroutine');
+local co = coroutine.create( myfn );
+print( 'run', coroutine.resume( co, unpack( args ) ) );
+print( 'run', coroutine.resume( co, unpack( args ) ) );
+-- cannot resume dead coroutine
+print( 'run', coroutine.resume( co, unpack( args ) ) );
+
+print('');
+
+print('ReCo');
+co = reco.new( myfn );
+print( 'run', co( unpack( args ) ) );
+print( 'run', co( unpack( args ) ) );
+print( 'run', co( unpack( args ) ) );
+
 
