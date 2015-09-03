@@ -25,4 +25,10 @@ print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 
+print('');
+
+print('Arguments');
+co = reco.new( myfn, 1, 2, 3, 4 );
+print( 'args', co:getArgs() );
+
 
