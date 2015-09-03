@@ -68,16 +68,27 @@ static int getargs_lua( lua_State *L )
     reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
     int *args = c->args;
     int narg = c->narg;
-    int i = 1;
+    int idx = 1;
     
-    // push func and arguments
-    for(; i < narg; i++ ){
-        lstate_pushref( L, args[i] );
+    // push all curried arguments
+    if( lua_gettop( L ) == 1 )
+    {
+        for(; idx < narg; idx++ ){
+            lstate_pushref( L, args[idx] );
+        }
+        
+        return narg - 1;
     }
     
-    return narg - 1;
+    // push an curried argument
+    idx = (int)luaL_checkinteger( L, 2 );
+    if( idx > 0 && idx < narg ){
+        lstate_pushref( L, args[idx] );
+        return 1;
+    }
+    
+    return 0;
 }
-
 
 
 static int call_lua( lua_State *L )
