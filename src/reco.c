@@ -63,6 +63,23 @@ typedef struct {
 #define MODULE_MT   "reco"
 
 
+static int getargs_lua( lua_State *L )
+{
+    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
+    int *args = c->args;
+    int narg = c->narg;
+    int i = 1;
+    
+    // push func and arguments
+    for(; i < narg; i++ ){
+        lstate_pushref( L, args[i] );
+    }
+    
+    return narg - 1;
+}
+
+
+
 static int call_lua( lua_State *L )
 {
     reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
@@ -218,6 +235,10 @@ LUALIB_API int luaopen_reco( lua_State *L )
         { "__call", call_lua },
         { NULL, NULL }
     };
+    struct luaL_Reg method[] = {
+        { "getArgs", getargs_lua },
+        { NULL, NULL }
+    };
     struct luaL_Reg *ptr = mmethod;
     
     // create table __metatable
@@ -227,6 +248,15 @@ LUALIB_API int luaopen_reco( lua_State *L )
         lstate_fn2tbl( L, ptr->name, ptr->func );
         ptr++;
     }
+    // methods
+    ptr = method;
+    lua_pushstring( L, "__index" );
+    lua_newtable( L );
+    while( ptr->name ){
+        lstate_fn2tbl( L, ptr->name, ptr->func );
+        ptr++;
+    }
+    lua_rawset( L, -3 );
     lua_pop( L, 1 );
     
     // add new function
