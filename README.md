@@ -26,6 +26,15 @@ create a new reusable coroutine object.
 2. `err:str`: error string. 
 
 
+### ... = co:getArgs()
+
+returns an curried arguments.
+
+**Returns**
+
+- `...`: curried arguments of coroutine.
+
+
 ### ok, ... = co( ... )
 
 run a reusable coroutine object.
@@ -69,4 +78,10 @@ co = reco.new( myfn );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
+
+print('');
+
+print('Arguments');
+co = reco.new( myfn, 1, 2, 3, 4 );
+print( 'args', co:getArgs() );
 ```
