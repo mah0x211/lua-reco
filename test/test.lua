@@ -30,5 +30,7 @@ print('');
 print('Arguments');
 co = reco.new( myfn, 1, 2, 3, 4 );
 print( 'args', co:getArgs() );
+print( 'arg idx:1', co:getArgs(1) );
+
 
 
