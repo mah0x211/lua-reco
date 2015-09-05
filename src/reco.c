@@ -52,6 +52,13 @@
 }while(0)
 
 
+#define lstate_num2tbl(L,k,v) do{ \
+    lua_pushstring(L,k); \
+    lua_pushinteger(L,v); \
+    lua_rawset(L,-3); \
+}while(0)
+
+
 typedef struct {
     lua_State *L;
     int status;
@@ -61,6 +68,16 @@ typedef struct {
 
 
 #define MODULE_MT   "reco"
+
+
+static int status_lua( lua_State *L )
+{
+    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
+    
+    lua_pushinteger( L, c->status );
+    
+    return 1;
+}
 
 
 static int getargs_lua( lua_State *L )
@@ -249,6 +266,7 @@ LUALIB_API int luaopen_reco( lua_State *L )
     };
     struct luaL_Reg method[] = {
         { "getArgs", getargs_lua },
+        { "status", status_lua },
         { NULL, NULL }
     };
     struct luaL_Reg *ptr = mmethod;
@@ -274,7 +292,14 @@ LUALIB_API int luaopen_reco( lua_State *L )
     // add new function
     lua_newtable( L );
     lstate_fn2tbl( L, "new", new_lua );
-    
+    // add status code
+    lstate_num2tbl( L, "OK", 0 );
+    lstate_num2tbl( L, "YIELD", LUA_YIELD );
+    lstate_num2tbl( L, "ERRMEM", LUA_ERRMEM );
+    lstate_num2tbl( L, "ERRERR", LUA_ERRERR );
+    lstate_num2tbl( L, "ERRSYNTAX", LUA_ERRSYNTAX );
+    lstate_num2tbl( L, "ERRRUN", LUA_ERRRUN );
+
     return 1;
 }
 
