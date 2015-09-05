@@ -9,6 +9,16 @@ reusable coroutine module.
 luarocks install reco --from=http://mah0x211.github.io/rocks/
 ```
 
+## Status Code Constants
+
+- reco.OK
+- reco.YIELD
+- reco.ERRMEM
+- reco.ERRERR
+- reco.ERRSYNTAX
+- reco.ERRRUN
+    
+
 ## API
 
 ### co, err = reco.new( fn:function, ... )
@@ -37,6 +47,15 @@ returns curried arguments.
 **Returns**
 
 - `...`: curried arguments of coroutine.
+
+
+### status = co:status()
+
+returns a last status code.
+
+**Returns**
+
+- `status:int`: status code.
 
 
 ### ok, ... = co( ... )
