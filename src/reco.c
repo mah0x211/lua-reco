@@ -106,7 +106,8 @@ static int call_lua( lua_State *L )
     {
         // failed to create new thread
         if( !( th = lua_newthread( L ) ) ){
-            lua_pushinteger( L, LUA_ERRMEM );
+            c->status = LUA_ERRMEM;
+            lua_pushboolean( L, 0 );
             lua_pushstring( L, strerror( errno ) );
             return 2;
         }
