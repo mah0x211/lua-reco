@@ -114,7 +114,7 @@ static int call_lua( lua_State *L )
     int argc = lua_gettop( L ) - 1;
     lua_State *th = c->L;
     int *args = c->args;
-    int narg = c->narg;
+    const int narg = c->narg;
     int status = c->status;
     int i = 0;
     
@@ -145,13 +145,12 @@ static int call_lua( lua_State *L )
     if( argc ){
         lua_xmove( L, th, argc );
     }
-    narg = i - 1 + argc;
     
     // run thread
 #if LUA_VERSION_NUM >= 502
-    status = lua_resume( th, L, narg );
+    status = lua_resume( th, L, i - 1 + argc );
 #else
-    status = lua_resume( th, narg );
+    status = lua_resume( th, i - 1 + argc );
 #endif
     // update status
     c->status = status;
@@ -161,9 +160,9 @@ static int call_lua( lua_State *L )
         case 0:
         case LUA_YIELD:
             lua_pushboolean( L, 1 );
-            narg = lua_gettop( th );
-            lua_xmove( th, L, narg );
-            return 1 + narg;
+            argc = lua_gettop( th );
+            lua_xmove( th, L, argc );
+            return 1 + argc;
         
         // got error
         // LUA_ERRMEM:
