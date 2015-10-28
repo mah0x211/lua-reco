@@ -52,6 +52,13 @@
 }while(0)
 
 
+#define lstate_str2tbl(L,k,v) do{ \
+    lua_pushstring(L,k); \
+    lua_pushstring(L,v); \
+    lua_rawset(L,-3); \
+}while(0)
+
+
 #define lstate_num2tbl(L,k,v) do{ \
     lua_pushstring(L,k); \
     lua_pushinteger(L,v); \
@@ -117,7 +124,8 @@ static int call_lua( lua_State *L )
     const int narg = c->narg;
     int status = c->status;
     int i = 0;
-    
+    int rv = 3;
+
     // should create new thread
     if( !th )
     {
@@ -171,14 +179,36 @@ static int call_lua( lua_State *L )
         // LUA_ERRRUN:
         default:
             lua_pushboolean( L, 0 );
+            // error message
             lua_xmove( th, L, 1 );
+            lua_pushinteger( L, status );
+            // traceback
+#if LUA_VERSION_NUM >= 502
+            // get stack trace
+            luaL_traceback( L, th, lua_tostring( L, -1 ), 1 );
+#else
+            // get debug module
+            lua_getfield( th, LUA_GLOBALSINDEX, "debug" );
+            if( lua_istable( th, -1 ) != 0 )
+            {
+                // get traceback function
+                lua_getfield( th, -1, "traceback" );
+                if( lua_isfunction( th, -1 ) != 0 ){
+                    // call
+                    lua_call( th, 0, 1 );
+                    // append to message field
+                    lua_xmove( th, L, 1 );
+                    rv++;
+                }
+            }
+#endif
             // re-create thread
             if( ( c->L = lua_newthread( L ) ) ){
                 // retain thread
                 args[narg] = lstate_ref( L );
             }
             
-            return 2;
+            return rv;
     }
 }
 
