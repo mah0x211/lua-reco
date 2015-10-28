@@ -69,7 +69,7 @@ run a reusable coroutine object.
 **Returns**
 
 1. `ok:boolean`: true on success, or false on failure.
-2. function return values, or error string.
+2. function return values, or error string, status code and traceback.
 
 
 ## Usage
