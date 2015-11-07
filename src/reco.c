@@ -203,6 +203,7 @@ static int call_lua( lua_State *L )
             }
 #endif
             // re-create thread
+            lstate_unref( L, args[narg] );
             if( ( c->L = lua_newthread( L ) ) ){
                 // retain thread
                 args[narg] = lstate_ref( L );
