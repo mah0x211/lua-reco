@@ -25,12 +25,20 @@ print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 
+-- error
 print('');
 
-print('Arguments');
-co = reco.new( myfn, 1, 2, 3, 4 );
-print( 'args', co:getArgs() );
-print( 'arg idx:1', co:getArgs(1) );
+local function myfnerr( ... )
+    local a;
 
+    print('try throw error');
+
+    a = a + {...};
+end
+
+
+print('Error Value');
+co = reco.new( myfnerr );
+print( 'result', co() );
 
 
