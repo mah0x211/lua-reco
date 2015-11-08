@@ -21,14 +21,14 @@ luarocks install reco --from=http://mah0x211.github.io/rocks/
 
 ## API
 
-### co, err = reco.new( fn:function, ... )
+### co, err = reco.new( fn:function )
 
 create a new reusable coroutine object.
 
 **Parameters**
 
 - `fn:function`: function that run in coroutine.
-- `...`: arguments that passed to fn on invocation.
+
 
 **Returns**
 
@@ -36,26 +36,9 @@ create a new reusable coroutine object.
 2. `err:str`: error string. 
 
 
-### ... = co:getArgs( [idx:int] )
+**Properties**
 
-returns curried arguments.
-
-**Parameters**
-
-- `idx:int`: argument index number.
-
-**Returns**
-
-- `...`: curried arguments of coroutine.
-
-
-### status = co:status()
-
-returns a last status code.
-
-**Returns**
-
-- `status:int`: status code.
+- `co.status:int`: a last status code.
 
 
 ### ok, ... = co( ... )
@@ -70,6 +53,7 @@ run a reusable coroutine object.
 
 1. `ok:boolean`: true on success, or false on failure.
 2. function return values, or error string, status code and traceback.
+
 
 
 ## Usage
@@ -101,11 +85,4 @@ co = reco.new( myfn );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
 print( 'run', co( unpack( args ) ) );
-
-print('');
-
-print('Arguments');
-co = reco.new( myfn, 1, 2, 3, 4 );
-print( 'args', co:getArgs() );
-print( 'arg idx:1', co:getArgs(1) );
 ```
