@@ -36,25 +36,9 @@
 
 
 // helper macros for lua_State
-#define lstate_ref(L) \
-    luaL_ref( L, LUA_REGISTRYINDEX )
-
-#define lstate_pushref(L,ref) \
-    lua_rawgeti( L, LUA_REGISTRYINDEX, ref )
-
-#define lstate_unref(L,ref) \
-    (luaL_unref( L, LUA_REGISTRYINDEX, ref ),LUA_NOREF)
-
 #define lstate_fn2tbl(L,k,v) do{ \
     lua_pushstring(L,k); \
     lua_pushcfunction(L,v); \
-    lua_rawset(L,-3); \
-}while(0)
-
-
-#define lstate_str2tbl(L,k,v) do{ \
-    lua_pushstring(L,k); \
-    lua_pushstring(L,v); \
     lua_rawset(L,-3); \
 }while(0)
 
@@ -66,107 +50,67 @@
 }while(0)
 
 
-typedef struct {
-    lua_State *L;
-    int status;
-    int narg;
-    int *args;
-} reco_t;
-
-
 #define MODULE_MT   "reco"
-
-
-static int status_lua( lua_State *L )
-{
-    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
-    
-    lua_pushinteger( L, c->status );
-    
-    return 1;
-}
-
-
-static int getargs_lua( lua_State *L )
-{
-    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
-    int *args = c->args;
-    int narg = c->narg;
-    int idx = 1;
-    
-    // push all curried arguments
-    if( lua_gettop( L ) == 1 )
-    {
-        for(; idx < narg; idx++ ){
-            lstate_pushref( L, args[idx] );
-        }
-        
-        return narg - 1;
-    }
-    
-    // push an curried argument
-    idx = (int)luaL_checkinteger( L, 2 );
-    if( idx > 0 && idx < narg ){
-        lstate_pushref( L, args[idx] );
-        return 1;
-    }
-    
-    return 0;
-}
 
 
 static int call_lua( lua_State *L )
 {
-    reco_t *c = (reco_t*)luaL_checkudata( L, 1, MODULE_MT );
     int argc = lua_gettop( L ) - 1;
-    lua_State *th = c->L;
-    int *args = c->args;
-    const int narg = c->narg;
-    int status = c->status;
-    int i = 0;
+    lua_State *th = NULL;
+    lua_Integer status = 0;
     int rv = 3;
+    int i;
 
+    lua_getfield( L, 1, "status" );
+    status = luaL_optinteger( L, -1, 0 );
+    lua_pop( L, 1 );
+
+    lua_getfield( L, 1, "co" );
     // should create new thread
-    if( !th )
+    if( !lua_isthread( L, -1 ) )
     {
         // failed to create new thread
         if( !( th = lua_newthread( L ) ) ){
-            c->status = LUA_ERRMEM;
             lua_pushboolean( L, 0 );
             lua_pushstring( L, strerror( errno ) );
             return 2;
         }
         // retain thread
-        args[narg] = lstate_ref( L );
-        c->L = th;
-    }
-    // skip function if yield
-    else {
-        i += status == LUA_YIELD;
-    }
-    
-    // push func and arguments
-    for(; i < narg; i++ ){
-        lstate_pushref( th, args[i] );
-    }
-    // move args to thread
-    if( argc ){
+        lua_setfield( L, 1, "co" );
+
+        lua_getfield( L, 1, "fn" );
+        lua_xmove( L, th, 1 );
         lua_xmove( L, th, argc );
     }
-    
+    else
+    {
+        th = lua_tothread( L, -1 );
+        lua_pop( L, 1 );
+        // skip function if yield
+        if( status == LUA_YIELD ){
+            lua_xmove( L, th, argc );
+        }
+        else {
+            lua_getfield( L, 1, "fn" );
+            lua_xmove( L, th, 1 );
+            lua_xmove( L, th, argc );
+        }
+    }
+
     // run thread
 #if LUA_VERSION_NUM >= 502
-    status = lua_resume( th, L, i - 1 + argc );
+    status = lua_resume( th, L, argc );
 #else
-    status = lua_resume( th, i - 1 + argc );
+    status = lua_resume( th, argc );
 #endif
-    // update status
-    c->status = status;
-    
+    lua_pushinteger( L, status );
+    lua_setfield( L, 1, "status" );
+
     switch( status )
     {
         case 0:
         case LUA_YIELD:
+            lua_settop( L, 0 );
             lua_pushboolean( L, 1 );
             argc = lua_gettop( th );
             lua_xmove( th, L, argc );
@@ -178,22 +122,27 @@ static int call_lua( lua_State *L )
         // LUA_ERRSYNTAX:
         // LUA_ERRRUN:
         default:
+            lua_pushnil( L );
+            lua_setfield( L, 1, "co" );
+            lua_settop( L, 0 );
             lua_pushboolean( L, 0 );
             // error message
             lua_xmove( th, L, 1 );
+            // status
             lua_pushinteger( L, status );
             // traceback
 #if LUA_VERSION_NUM >= 502
             // get stack trace
             luaL_traceback( L, th, lua_tostring( L, -1 ), 1 );
+            rv++;
 #else
             // get debug module
             lua_getfield( th, LUA_GLOBALSINDEX, "debug" );
-            if( lua_istable( th, -1 ) != 0 )
+            if( lua_istable( th, -1 ) )
             {
                 // get traceback function
                 lua_getfield( th, -1, "traceback" );
-                if( lua_isfunction( th, -1 ) != 0 ){
+                if( lua_isfunction( th, -1 ) ){
                     // call
                     lua_call( th, 0, 1 );
                     // append to message field
@@ -202,80 +151,36 @@ static int call_lua( lua_State *L )
                 }
             }
 #endif
-            // re-create thread
-            lstate_unref( L, args[narg] );
-            if( ( c->L = lua_newthread( L ) ) ){
-                // retain thread
-                args[narg] = lstate_ref( L );
-            }
-            
+
             return rv;
     }
 }
 
 
-static int tostring_lua( lua_State *L )
-{
-    lua_pushfstring( L, MODULE_MT ": %p", luaL_checkudata( L, 1, MODULE_MT ) );
-    
-    return 1;
-}
-
-
-static int gc_lua( lua_State *L )
-{
-    reco_t *c = (reco_t*)lua_touserdata( L, 1 );
-    int narg = c->narg + 1;
-    int i = 0;
-    
-    // release references
-    for(; i < narg; i++ ){
-        lstate_unref( L, c->args[i] );
-    }
-    free( (void*)c->args );
-    
-    return 0;
-}
-
-
 static int new_lua( lua_State *L )
 {
-    int narg = lua_gettop( L );
-    lua_State *th = NULL;
-    reco_t *c = NULL;
-    int *args = NULL;
-    
-    // check fisrt argument
     luaL_checktype( L, 1, LUA_TFUNCTION );
-    // alloc
-    if( ( th = lua_newthread( L ) ) &&
-        ( c = lua_newuserdata( L, sizeof( reco_t ) ) ) &&
-        // narg(fn + other arguments) + thread
-        ( args = (int*)malloc( ( narg + 1 ) * sizeof( int ) ) ) )
+    lua_settop( L, 1 );
+
+    lua_createtable( L, 0, 3 );
+    if( lua_istable( L, -1 ) )
     {
-        // temporary retain userdata
-        int ref = lstate_ref( L );
-        int i = narg;
-        
-        // retain thread
-        args[narg] = lstate_ref( L );
-        // retain args
-        for(; i > 0; i-- ){
-            args[i - 1] = lstate_ref( L );
+        lua_pushvalue( L, 1 );
+        lua_setfield( L, -2, "fn" );
+
+        // alloc thread
+        if( lua_newthread( L ) ){
+            lua_setfield( L, -2, "co" );
+            // status
+            lua_pushinteger( L, 0 );
+            lua_setfield( L, -2, "status" );
+            // set metatable
+            luaL_getmetatable( L, MODULE_MT );
+            lua_setmetatable( L, -2 );
+
+            return 1;
         }
-        
-        c->L = th;
-        c->status = 0;
-        c->narg = narg;
-        c->args = args;
-        // push and release userdata
-        lstate_pushref( L, ref );
-        lstate_unref( L, ref );
-        // set metatable
-        luaL_getmetatable( L, MODULE_MT );
-        lua_setmetatable( L, -2 );
-        
-        return 1;
+        lua_settop( L, 0 );
     }
     
     // got error
@@ -289,14 +194,7 @@ static int new_lua( lua_State *L )
 LUALIB_API int luaopen_reco( lua_State *L )
 {
     struct luaL_Reg mmethod[] = {
-        { "__gc", gc_lua },
-        { "__tostring", tostring_lua },
         { "__call", call_lua },
-        { NULL, NULL }
-    };
-    struct luaL_Reg method[] = {
-        { "getArgs", getargs_lua },
-        { "status", status_lua },
         { NULL, NULL }
     };
     struct luaL_Reg *ptr = mmethod;
@@ -308,15 +206,6 @@ LUALIB_API int luaopen_reco( lua_State *L )
         lstate_fn2tbl( L, ptr->name, ptr->func );
         ptr++;
     }
-    // methods
-    ptr = method;
-    lua_pushstring( L, "__index" );
-    lua_newtable( L );
-    while( ptr->name ){
-        lstate_fn2tbl( L, ptr->name, ptr->func );
-        ptr++;
-    }
-    lua_rawset( L, -3 );
     lua_pop( L, 1 );
     
     // add new function
