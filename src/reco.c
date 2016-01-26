@@ -133,7 +133,7 @@ static int call_lua( lua_State *L )
             // traceback
 #if LUA_VERSION_NUM >= 502
             // get stack trace
-            luaL_traceback( L, th, lua_tostring( L, -1 ), 1 );
+            luaL_traceback( L, th, NULL, 0 );
             rv++;
 #else
             // get debug module
