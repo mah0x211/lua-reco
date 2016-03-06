@@ -58,7 +58,7 @@ static int call_lua( lua_State *L )
     int argc = lua_gettop( L ) - 1;
     lua_State *th = NULL;
     lua_Integer status = 0;
-    int rv = 3;
+    int rv = 2;
     int i;
 
     lua_getfield( L, 1, "status" );
@@ -128,8 +128,6 @@ static int call_lua( lua_State *L )
             lua_pushboolean( L, 0 );
             // error message
             lua_xmove( th, L, 1 );
-            // status
-            lua_pushinteger( L, status );
             // traceback
 #if LUA_VERSION_NUM >= 502
             // get stack trace
