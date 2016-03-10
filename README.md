@@ -32,7 +32,7 @@ create a new reusable coroutine object.
 
 **Returns**
 
-1. `co:userdata`: reco object or nil.
+1. `co:table`: table wrapped in the reco metatable, or nil.
 2. `err:str`: error string. 
 
 
