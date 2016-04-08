@@ -74,10 +74,7 @@ static int call_lua( lua_State *L )
         }
         // retain thread
         lua_setfield( L, 1, "co" );
-
-        lua_getfield( L, 1, "fn" );
-        lua_xmove( L, th, 1 );
-        lua_xmove( L, th, argc );
+        goto SET_ENTRYFN;
     }
     else
     {
@@ -94,6 +91,7 @@ static int call_lua( lua_State *L )
         }
         // set function
         else {
+SET_ENTRYFN:
             lua_getfield( L, 1, "fn" );
             lua_xmove( L, th, 1 );
             lua_xmove( L, th, argc );
