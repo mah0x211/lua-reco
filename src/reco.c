@@ -61,14 +61,11 @@ static int call_lua( lua_State *L )
     int rv = 2;
     int i;
 
-    lua_getfield( L, 1, "status" );
-    status = luaL_optinteger( L, -1, 0 );
-    lua_pop( L, 1 );
-
     lua_getfield( L, 1, "co" );
     // should create new thread
     if( !lua_isthread( L, -1 ) )
     {
+        lua_pop( L, 1 );
         // failed to create new thread
         if( !( th = lua_newthread( L ) ) ){
             lua_pushboolean( L, 0 );
@@ -84,12 +81,18 @@ static int call_lua( lua_State *L )
     }
     else
     {
+        // get current status
+        lua_getfield( L, 1, "status" );
+        status = luaL_optinteger( L, -1, 0 );
+        lua_pop( L, 1 );
+
         th = lua_tothread( L, -1 );
         lua_pop( L, 1 );
         // skip function if yield
         if( status == LUA_YIELD ){
             lua_xmove( L, th, argc );
         }
+        // set function
         else {
             lua_getfield( L, 1, "fn" );
             lua_xmove( L, th, 1 );
@@ -112,6 +115,7 @@ static int call_lua( lua_State *L )
         case LUA_YIELD:
             lua_settop( L, 0 );
             lua_pushboolean( L, 1 );
+            // move the thread return values to caller
             argc = lua_gettop( th );
             lua_xmove( th, L, argc );
             return 1 + argc;
@@ -122,12 +126,15 @@ static int call_lua( lua_State *L )
         // LUA_ERRSYNTAX:
         // LUA_ERRRUN:
         default:
+            // remove current thread
             lua_pushnil( L );
             lua_setfield( L, 1, "co" );
             lua_settop( L, 0 );
+
             lua_pushboolean( L, 0 );
-            // error message
+            // move an error message to caller
             lua_xmove( th, L, 1 );
+
             // traceback
 #if LUA_VERSION_NUM >= 502
             // get stack trace
