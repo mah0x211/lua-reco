@@ -66,6 +66,8 @@ static int call_lua( lua_State *L )
     if( !lua_isthread( L, -1 ) )
     {
         lua_pop( L, 1 );
+
+CREATE_NEWTHREAD:
         // failed to create new thread
         if( !( th = lua_newthread( L ) ) ){
             lua_pushboolean( L, 0 );
@@ -78,23 +80,27 @@ static int call_lua( lua_State *L )
     }
     else
     {
-        // get current status
-        lua_getfield( L, 1, "status" );
-        status = luaL_optinteger( L, -1, 0 );
-        lua_pop( L, 1 );
-
         th = lua_tothread( L, -1 );
         lua_pop( L, 1 );
-        // skip function if yield
-        if( status == LUA_YIELD ){
-            lua_xmove( L, th, argc );
-        }
-        // set function
-        else {
+
+        // get current status
+        switch( lua_status( th ) ){
+            // push function and arguments
+            case 0:
 SET_ENTRYFN:
-            lua_getfield( L, 1, "fn" );
-            lua_xmove( L, th, 1 );
-            lua_xmove( L, th, argc );
+                lua_getfield( L, 1, "fn" );
+                lua_xmove( L, th, 1 );
+                lua_xmove( L, th, argc );
+            break;
+            
+            // push arguments if yield
+            case LUA_YIELD:
+                lua_xmove( L, th, argc );
+            break;
+            
+            
+            default:
+                goto CREATE_NEWTHREAD;
         }
     }
 
