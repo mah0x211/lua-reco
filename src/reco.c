@@ -68,12 +68,7 @@ static int call_lua( lua_State *L )
         lua_pop( L, 1 );
 
 CREATE_NEWTHREAD:
-        // failed to create new thread
-        if( !( th = lua_newthread( L ) ) ){
-            lua_pushboolean( L, 0 );
-            lua_pushstring( L, strerror( errno ) );
-            return 2;
-        }
+        th = lua_newthread( L );
         // retain thread
         lua_setfield( L, 1, "co" );
         goto SET_ENTRYFN;
@@ -172,24 +167,21 @@ static int new_lua( lua_State *L )
     lua_settop( L, 1 );
 
     lua_createtable( L, 0, 3 );
-    if( lua_istable( L, -1 ) )
-    {
+    if( lua_istable( L, -1 ) ){
         lua_pushvalue( L, 1 );
         lua_setfield( L, -2, "fn" );
 
         // alloc thread
-        if( lua_newthread( L ) ){
-            lua_setfield( L, -2, "co" );
-            // status
-            lua_pushinteger( L, 0 );
-            lua_setfield( L, -2, "status" );
-            // set metatable
-            luaL_getmetatable( L, MODULE_MT );
-            lua_setmetatable( L, -2 );
+        lua_newthread( L );
+        lua_setfield( L, -2, "co" );
+        // status
+        lua_pushinteger( L, 0 );
+        lua_setfield( L, -2, "status" );
+        // set metatable
+        luaL_getmetatable( L, MODULE_MT );
+        lua_setmetatable( L, -2 );
 
-            return 1;
-        }
-        lua_settop( L, 0 );
+        return 1;
     }
 
     // got error
