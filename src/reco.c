@@ -92,13 +92,13 @@ SET_ENTRYFN:
                 lua_xmove( L, th, 1 );
                 lua_xmove( L, th, argc );
             break;
-            
+
             // push arguments if yield
             case LUA_YIELD:
                 lua_xmove( L, th, argc );
             break;
-            
-            
+
+
             default:
                 goto CREATE_NEWTHREAD;
         }
@@ -123,7 +123,7 @@ SET_ENTRYFN:
             argc = lua_gettop( th );
             lua_xmove( th, L, argc );
             return 1 + argc;
-        
+
         // got error
         // LUA_ERRMEM:
         // LUA_ERRERR:
@@ -191,11 +191,11 @@ static int new_lua( lua_State *L )
         }
         lua_settop( L, 0 );
     }
-    
+
     // got error
     lua_pushnil( L );
     lua_pushstring( L, strerror( errno ) );
-    
+
     return 2;
 }
 
@@ -207,7 +207,7 @@ LUALIB_API int luaopen_reco( lua_State *L )
         { NULL, NULL }
     };
     struct luaL_Reg *ptr = mmethod;
-    
+
     // create table __metatable
     luaL_newmetatable( L, MODULE_MT );
     // metamethods
@@ -216,7 +216,7 @@ LUALIB_API int luaopen_reco( lua_State *L )
         ptr++;
     }
     lua_pop( L, 1 );
-    
+
     // add new function
     lua_newtable( L );
     lstate_fn2tbl( L, "new", new_lua );
