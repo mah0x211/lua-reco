@@ -1,5 +1,5 @@
-/*
- *  Copyright (C) 2015 Masatoshi Teruya
+/**
+ *  Copyright (C) 2015 Masatoshi Fukunaga
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -60,6 +60,9 @@ static int call_lua( lua_State *L )
     lua_Integer status = 0;
     int rv = 2;
     int i;
+#if LUA_VERSION_NUM >= 504
+    int nres = 0;
+#endif
 
     lua_getfield( L, 1, "co" );
     // should create new thread
@@ -100,7 +103,9 @@ SET_ENTRYFN:
     }
 
     // run thread
-#if LUA_VERSION_NUM >= 502
+#if LUA_VERSION_NUM >= 504
+    status = lua_resume( th, L, argc, &nres );
+#elif LUA_VERSION_NUM >= 502
     status = lua_resume( th, L, argc );
 #else
     status = lua_resume( th, argc );
@@ -115,9 +120,14 @@ SET_ENTRYFN:
             lua_settop( L, 0 );
             lua_pushboolean( L, 1 );
             // move the thread return values to caller
+#if LUA_VERSION_NUM >= 504
+            lua_xmove( th, L, nres );
+            return 1 + nres;
+#else
             argc = lua_gettop( th );
             lua_xmove( th, L, argc );
             return 1 + argc;
+#endif
 
         // got error
         // LUA_ERRMEM:
@@ -222,5 +232,3 @@ LUALIB_API int luaopen_reco( lua_State *L )
 
     return 1;
 }
-
-
