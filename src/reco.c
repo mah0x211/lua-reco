@@ -34,19 +34,19 @@
 #include <lua.h>
 
 // helper macros for lua_State
-#define lstate_fn2tbl(L, k, v)                                                 \
- do {                                                                          \
-  lua_pushstring(L, k);                                                        \
-  lua_pushcfunction(L, v);                                                     \
-  lua_rawset(L, -3);                                                           \
- } while (0)
+static inline void rawset_func(lua_State *L, const char *k, lua_CFunction v)
+{
+    lua_pushstring(L, k);
+    lua_pushcfunction(L, v);
+    lua_rawset(L, -3);
+}
 
-#define lstate_num2tbl(L, k, v)                                                \
- do {                                                                          \
-  lua_pushstring(L, k);                                                        \
-  lua_pushinteger(L, v);                                                       \
-  lua_rawset(L, -3);                                                           \
- } while (0)
+static inline void rawset_int(lua_State *L, const char *k, int v)
+{
+    lua_pushstring(L, k);
+    lua_pushinteger(L, v);
+    lua_rawset(L, -3);
+}
 
 #define MODULE_MT "reco"
 
@@ -203,21 +203,21 @@ LUALIB_API int luaopen_reco(lua_State *L)
     luaL_newmetatable(L, MODULE_MT);
     // metamethods
     while (ptr->name) {
-        lstate_fn2tbl(L, ptr->name, ptr->func);
+        rawset_func(L, ptr->name, ptr->func);
         ptr++;
     }
     lua_pop(L, 1);
 
     // add new function
     lua_newtable(L);
-    lstate_fn2tbl(L, "new", new_lua);
+    rawset_func(L, "new", new_lua);
     // add status code
-    lstate_num2tbl(L, "OK", 0);
-    lstate_num2tbl(L, "YIELD", LUA_YIELD);
-    lstate_num2tbl(L, "ERRMEM", LUA_ERRMEM);
-    lstate_num2tbl(L, "ERRERR", LUA_ERRERR);
-    lstate_num2tbl(L, "ERRSYNTAX", LUA_ERRSYNTAX);
-    lstate_num2tbl(L, "ERRRUN", LUA_ERRRUN);
+    rawset_int(L, "OK", 0);
+    rawset_int(L, "YIELD", LUA_YIELD);
+    rawset_int(L, "ERRMEM", LUA_ERRMEM);
+    rawset_int(L, "ERRERR", LUA_ERRERR);
+    rawset_int(L, "ERRSYNTAX", LUA_ERRSYNTAX);
+    rawset_int(L, "ERRRUN", LUA_ERRRUN);
 
     return 1;
 }
