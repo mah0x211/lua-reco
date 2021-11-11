@@ -1,12 +1,14 @@
 lua-reco
 ===
 
+[![test](https://github.com/mah0x211/lua-reco/actions/workflows/test.yml/badge.svg)](https://github.com/mah0x211/lua-reco/actions/workflows/test.yml)
+
 reusable coroutine module.
 
 ## Installation
 
 ```
-luarocks install reco --from=http://mah0x211.github.io/rocks/
+luarocks install reco
 ```
 
 ## Status Code Constants
@@ -17,11 +19,19 @@ luarocks install reco --from=http://mah0x211.github.io/rocks/
 - reco.ERRERR
 - reco.ERRSYNTAX
 - reco.ERRRUN
-    
+- reco.ERRFILE (`if defined`)
 
-## API
 
-### co, err = reco.new( fn:function )
+## Create an instance of reco
+
+```lua
+local reco = require('reco')
+local co = assert(reco.new(function()
+    print('hello')
+end))
+```
+
+### co, err = reco.new( fn )
 
 create a new reusable coroutine object.
 
@@ -29,60 +39,97 @@ create a new reusable coroutine object.
 
 - `fn:function`: function that run in coroutine.
 
-
 **Returns**
 
-1. `co:table`: table wrapped in the reco metatable, or nil.
-2. `err:str`: error string. 
+- `co:reco`: table wrapped in the reco metatable, or nil.
+- `err:str`: error string. 
 
 
-**Properties**
+## Execution and return values
 
-- `co.status:int`: a last status code.
+### done, status = co( ... )
 
-
-### ok, ... = co( ... )
-
-run a reusable coroutine object.
+starts or continues the execution of coroutine.
 
 **Parameters**
 
-- `...`: you can pass any arguments.
+- `...:any`: you can pass any arguments.
 
 **Returns**
 
-1. `ok:boolean`: true on success, or false on failure.
-2. function return values, or error string and traceback.
+- `done:boolean`: `true` on finished.
+- `status:integer`: status code.
 
+
+### ... = co:results()
+
+get the return values. these values will be removed from `co`.
+
+**Returns**
+
+- `...:any`: function return values, or error string and traceback.
 
 
 ## Usage
 
 ```lua
-local reco = require('reco');
+local unpack = unpack or table.unpack
+local reco = require('reco')
 
-local function myfn( ... )
-    print( 'args', ... );
-    coroutine.yield( 'a', 'b', 'c' );
-    print 'ok';
-    
-    return ...;
+local function myfn(...)
+    print('args', ...)
+    coroutine.yield('a', 'b', 'c')
+    print 'ok'
+    return ...
 end
 
-local args = { 'x', 'y', 'z' };
+local args = {
+    'x',
+    'y',
+    'z',
+}
 
-print('Coroutine');
-local co = coroutine.create( myfn );
-print( 'run', coroutine.resume( co, unpack( args ) ) );
-print( 'run', coroutine.resume( co, unpack( args ) ) );
--- cannot resume dead coroutine
-print( 'run', coroutine.resume( co, unpack( args ) ) );
+local function run_coroutine()
+    print('coroutine')
+    local co = coroutine.wrap(myfn)
+    print('run', co(unpack(args)))
+    print('run', co(unpack(args)))
+    -- cannot resume dead coroutine
+    local _, err = pcall(function()
+        print('run', co(unpack(args)))
+    end)
+    print(err)
+end
 
-print('');
+local function run_reco()
+    print('reco')
+    local co = reco.new(myfn)
+    print('run', co(unpack(args)))
+    print('res:', co:results())
+    print('run', co(unpack(args)))
+    print('res:', co:results())
+    print('run', co(unpack(args)))
+end
 
-print('ReCo');
-co = reco.new( myfn );
-print( 'run', co( unpack( args ) ) );
-print( 'run', co( unpack( args ) ) );
-print( 'run', co( unpack( args ) ) );
+local function run_reco_error()
+    local myfnerr = function(...)
+        print('it throw an error')
+        local a
+        a = a + {
+            ...,
+        }
+    end
+
+    print('reco with error function')
+    local co = reco.new(myfnerr)
+    local done, rc = co()
+    print(done, rc, rc == reco.ERRRUN)
+    print(co:results())
+end
+
+run_coroutine()
+print('')
+run_reco()
+print('')
+run_reco_error()
 ```
