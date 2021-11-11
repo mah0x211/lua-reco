@@ -22,7 +22,7 @@ luarocks install reco
 - reco.ERRFILE (`if defined`)
 
 
-## Create an instance of reco
+## Create and reset an instance of reco
 
 ```lua
 local reco = require('reco')
@@ -43,6 +43,15 @@ create a new reusable coroutine object.
 
 - `co:reco`: table wrapped in the reco metatable, or nil.
 - `err:str`: error string. 
+
+
+### co:reset( [fn] )
+
+replaces the function with the passed function and creates a new coroutine.
+
+**Parameters**
+
+- `fn:function`: function that run in coroutine.
 
 
 ## Execution and return values
