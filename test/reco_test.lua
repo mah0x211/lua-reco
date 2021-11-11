@@ -17,6 +17,50 @@ function testcase.new()
     assert.match(err, '#1 .+ [(]function expected, got table', false)
 end
 
+function testcase.reset()
+    local co = assert(reco.new(function()
+        coroutine.yield('foo', 'bar')
+        return 'baz', 'qux'
+    end))
+
+    -- test that returns values from yield
+    local done, rc = co()
+    assert.is_false(done)
+    assert.equal(rc, reco.YIELD)
+    assert.equal({
+        co:results(),
+    }, {
+        'foo',
+        'bar',
+    })
+
+    -- test that reset internal coroutine
+    co:reset()
+    done, rc = co()
+    assert.is_false(done)
+    assert.equal(rc, reco.YIELD)
+    assert.equal({
+        co:results(),
+    }, {
+        'foo',
+        'bar',
+    })
+
+    -- test that reset with new function
+    co:reset(function()
+        return 'hello', 'world!'
+    end)
+    done, rc = co()
+    assert.is_true(done)
+    assert.equal(rc, reco.OK)
+    assert.equal({
+        co:results(),
+    }, {
+        'hello',
+        'world!',
+    })
+end
+
 function testcase.call_results()
     local co = assert(reco.new(function()
         return 'foo', 1, {}

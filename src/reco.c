@@ -263,6 +263,26 @@ static int results_lua(lua_State *L)
     return nres;
 }
 
+static int reset_lua(lua_State *L)
+{
+    checkself(L);
+
+    // replace function
+    if (lua_gettop(L) > 1) {
+        luaL_checktype(L, 2, LUA_TFUNCTION);
+        lua_settop(L, 2);
+        lua_pushliteral(L, "fn");
+        lua_pushvalue(L, 2);
+        lua_rawset(L, 1);
+    }
+    // create new execution thread
+    lua_pushliteral(L, "th");
+    lua_newthread(L);
+    lua_rawset(L, 1);
+
+    return 0;
+}
+
 static int tostring_lua(lua_State *L)
 {
     checkself(L);
@@ -276,10 +296,11 @@ static int new_lua(lua_State *L)
     lua_settop(L, 1);
 
     lua_createtable(L, 0, 3);
+    // set function
     lua_pushliteral(L, "fn");
     lua_pushvalue(L, 1);
     lua_rawset(L, -3);
-    // execution thread
+    // create new execution thread
     lua_pushliteral(L, "th");
     lua_newthread(L);
     lua_rawset(L, -3);
@@ -305,6 +326,7 @@ LUALIB_API int luaopen_reco(lua_State *L)
             {NULL,         NULL        }
         };
         struct luaL_Reg method[] = {
+            {"reset",   reset_lua  },
             {"results", results_lua},
             {NULL,      NULL       }
         };
