@@ -259,25 +259,43 @@ static int getinfo_lua(lua_State *L)
         lua_setfield(L, -2, #field);                                           \
     } while (0)
 
-        push_string_field(L, name);
-        push_string_field(L, namewhat);
-        push_string_field(L, what);
-        push_string_field(L, source);
-        push_string_field(L, short_src);
-        push_int_field(L, currentline);
-        push_int_field(L, linedefined);
-        push_int_field(L, lastlinedefined);
-        push_int_field(L, nups);
+        if (strchr(what, 'n')) {
+            push_string_field(L, name);
+            push_string_field(L, namewhat);
+        }
+
+        if (strchr(what, 'S')) {
+            push_string_field(L, what);
+            push_string_field(L, source);
+            push_int_field(L, linedefined);
+            push_int_field(L, lastlinedefined);
+            push_string_field(L, short_src);
+        }
+
+        if (strchr(what, 'l')) {
+            push_int_field(L, currentline);
+        }
+
+        if (strchr(what, 'u')) {
+            push_int_field(L, nups);
+#if LUA_VERSION_NUM >= 502
+            push_int_field(L, nparams);
+            push_bool_field(L, isvararg);
+#endif
+        }
 
 #if LUA_VERSION_NUM >= 502
-        push_int_field(L, nparams);
-        push_bool_field(L, isvararg);
-        push_bool_field(L, istailcall);
+        if (strchr(what, 't')) {
+            push_bool_field(L, istailcall);
+            push_bool_field(L, istailcall);
+        }
 #endif
 
 #if LUA_VERSION_NUM >= 504
-        push_int_field(L, ftransfer);
-        push_int_field(L, ntransfer);
+        if (strchr(what, 'r')) {
+            push_int_field(L, ftransfer);
+            push_int_field(L, ntransfer);
+        }
 #endif
 
 #undef push_bool_field

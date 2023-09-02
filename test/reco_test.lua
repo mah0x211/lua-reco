@@ -152,6 +152,48 @@ function testcase.getinfo()
         source = fninfo.source,
         what = fninfo.what,
     })
+
+    -- test that get specific debug info of coroutine
+    local version = assert(tonumber(_VERSION:match('Lua (.+)')))
+    for what, fields in pairs({
+        n = {
+            'name',
+            'namewhat',
+        },
+        S = {
+            'what',
+            'linedefined',
+            'lastlinedefined',
+            'source',
+            'short_src',
+        },
+        l = {
+            'currentline',
+        },
+        u = {
+            'nups',
+            version >= 5.2 and 'nparams' or nil,
+            version >= 5.2 and 'isvararg' or nil,
+        },
+        t = version >= 5.2 and {
+            'istailcall',
+        } or nil,
+        r = version >= 5.4 and {
+            'ftransfer',
+            'ntransfer',
+        } or nil,
+    }) do
+        local tbl = co:getinfo(nil, what)
+        for _, field in ipairs(fields) do
+            local v = tbl[field]
+            if field == 'name' then
+                -- these fields can be nil
+                assert(v == nil or type(v) == 'string')
+            else
+                assert(tbl[field] ~= nil)
+            end
+        end
+    end
 end
 
 function testcase.throw_error()
