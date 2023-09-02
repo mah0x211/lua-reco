@@ -170,7 +170,8 @@ SET_ENTRYFN:
         lua_settop(L, 0);
         lua_pushboolean(L, 0);
         lua_pushinteger(L, rc);
-        return 2;
+        lua_pushboolean(L, 1);
+        return 3;
 
     // got error
     // LUA_ERRMEM:

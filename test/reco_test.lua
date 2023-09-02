@@ -23,9 +23,10 @@ function testcase.reset()
     end))
 
     -- test that returns values from yield
-    local done, rc = co()
+    local done, rc, again = co()
     assert.is_false(done)
     assert.equal(rc, reco.YIELD)
+    assert.is_true(again)
     assert.equal({
         co:results(),
     }, {
@@ -34,9 +35,10 @@ function testcase.reset()
     })
 
     -- test that returns values from return
-    done, rc = co()
+    done, rc, again = co()
     assert.is_true(done)
     assert.equal(rc, reco.OK)
+    assert.is_nil(again)
     assert.equal({
         co:results(),
     }, {
