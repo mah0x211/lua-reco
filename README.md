@@ -47,7 +47,7 @@ replaces the function with the passed function if it is not nil. and recreates t
 - `fn:function`: function that run in coroutine.
 
 
-## done, status = co( ... )
+## done, status, again = co( ... )
 
 starts or continues the execution of coroutine.
 
@@ -57,8 +57,9 @@ starts or continues the execution of coroutine.
 
 **Returns**
 
-- `done:boolean`: `true` on finished.
+- `done:boolean`: `true` if the coroutine is finished.
 - `status:integer`: status code.
+- `again:boolean`: `true` if the coroutine is yielded.
 
 
 ### info = co:getinfo( [level], [what] )
