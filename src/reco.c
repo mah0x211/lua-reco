@@ -39,31 +39,15 @@
 
 #define MODULE_MT "reco"
 
+typedef struct {
+    int ref_fn;
+    int ref_th;
+    int ref_res;
+    lua_State *th;
+    lua_State *res;
+} reco_t;
+
 // helper macros for lua_State
-static inline int getmodule_metatable(lua_State *L)
-{
-#if LUA_VERSION_NUM >= 503
-    return luaL_getmetatable(L, MODULE_MT);
-#else
-    luaL_getmetatable(L, MODULE_MT);
-    return lua_type(L, -1) != LUA_TNIL;
-#endif
-}
-
-static inline void checkself(lua_State *L)
-{
-    int top = lua_gettop(L);
-    int t   = lua_type(L, 1);
-
-    if (!lua_getmetatable(L, 1) || !getmodule_metatable(L) ||
-        !lua_rawequal(L, -1, -2)) {
-        char buf[255] = {0};
-        snprintf(buf, 255, MODULE_MT " expected, got %s", lua_typename(L, t));
-        luaL_argerror(L, 1, buf);
-    }
-    lua_settop(L, top);
-}
-
 static inline void rawset_func(lua_State *L, const char *k, lua_CFunction v)
 {
     lua_pushstring(L, k);
@@ -76,44 +60,6 @@ static inline void rawset_int(lua_State *L, const char *k, int v)
     lua_pushstring(L, k);
     lua_pushinteger(L, v);
     lua_rawset(L, -3);
-}
-
-static inline int rawget(lua_State *L, int idx, const char *k)
-{
-    lua_pushstring(L, k);
-    lua_rawget(L, idx);
-    return lua_type(L, -1);
-}
-
-static inline lua_State *rawget_thread(lua_State *L, int idx, const char *k,
-                                       int allow_nil)
-{
-    int t         = rawget(L, idx, k);
-    lua_State *th = NULL;
-
-    switch (t) {
-    case LUA_TTHREAD:
-        th = lua_tothread(L, -1);
-    case LUA_TNIL:
-        if (th || allow_nil) {
-            lua_pop(L, 1);
-            return th;
-        }
-
-    default:
-        luaL_error(L, "invalid value of '%s' field: %s expected, got %s", k,
-                   lua_typename(L, LUA_TTHREAD), lua_typename(L, t));
-        return NULL;
-    }
-}
-
-static inline void rawget_function(lua_State *L, int idx, const char *k)
-{
-    int t = rawget(L, idx, k);
-    if (t != LUA_TFUNCTION) {
-        luaL_error(L, "invalid value of '%s' field: %s expected, got %s", k,
-                   lua_typename(L, LUA_TFUNCTION), lua_typename(L, t));
-    }
 }
 
 static inline int traceback(lua_State *L, lua_State *th)
@@ -151,41 +97,38 @@ static inline int traceback(lua_State *L, lua_State *th)
 
 static int call_lua(lua_State *L)
 {
-    checkself(L);
-    int argc       = lua_gettop(L) - 1;
-    lua_State *th  = rawget_thread(L, 1, "th", 1);
-    lua_State *res = rawget_thread(L, 1, "res", 0);
-    int rc         = 0;
+    reco_t *r = luaL_checkudata(L, 1, MODULE_MT);
+    int argc  = lua_gettop(L) - 1;
+    int rc    = 0;
 #if LUA_VERSION_NUM >= 504
     int nres = 0;
 #endif
 
     // clear res thread
-    lua_settop(res, 0);
+    lua_settop(r->res, 0);
 
     // should create new thread
-    if (!th) {
+    if (!r->th) {
 CREATE_NEWTHREAD:
-        // retain thread
-        lua_pushliteral(L, "th");
-        th = lua_newthread(L);
-        lua_rawset(L, 1);
+        // create new thread
+        r->th     = lua_newthread(L);
+        r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
         goto SET_ENTRYFN;
     }
 
     // get current status
-    switch (lua_status(th)) {
+    switch (lua_status(r->th)) {
     case LUA_OK:
 SET_ENTRYFN:
         // push function and arguments
-        rawget_function(L, 1, "fn");
-        lua_xmove(L, th, 1);
-        lua_xmove(L, th, argc);
+        lua_rawgeti(L, LUA_REGISTRYINDEX, r->ref_fn);
+        lua_xmove(L, r->th, 1);
+        lua_xmove(L, r->th, argc);
         break;
 
     case LUA_YIELD:
         // push arguments if yield
-        lua_xmove(L, th, argc);
+        lua_xmove(L, r->th, argc);
         break;
 
     default:
@@ -194,20 +137,20 @@ SET_ENTRYFN:
 
     // run thread
 #if LUA_VERSION_NUM >= 504
-    rc = lua_resume(th, L, argc, &nres);
+    rc = lua_resume(r->th, L, argc, &nres);
 #elif LUA_VERSION_NUM >= 502
-    rc = lua_resume(th, L, argc);
+    rc = lua_resume(r->th, L, argc);
 #else
-    rc = lua_resume(th, argc);
+    rc = lua_resume(r->th, argc);
 #endif
 
     switch (rc) {
     case LUA_OK:
         // move the return values to res thread
 #if LUA_VERSION_NUM >= 504
-        lua_xmove(th, res, nres);
+        lua_xmove(r->th, r->res, nres);
 #else
-        lua_xmove(th, res, lua_gettop(th));
+        lua_xmove(r->th, r->res, lua_gettop(r->th));
 #endif
         lua_settop(L, 0);
         // return done=true
@@ -218,9 +161,9 @@ SET_ENTRYFN:
     case LUA_YIELD:
         // move the return values to res thread
 #if LUA_VERSION_NUM >= 504
-        lua_xmove(th, res, nres);
+        lua_xmove(r->th, r->res, nres);
 #else
-        lua_xmove(th, res, lua_gettop(th));
+        lua_xmove(r->th, r->res, lua_gettop(r->th));
 #endif
         // return done=false
         lua_settop(L, 0);
@@ -235,12 +178,12 @@ SET_ENTRYFN:
     // LUA_ERRRUN:
     default:
         // push stacktrace to res thread
-        traceback(res, th);
+        traceback(r->res, r->th);
 
         // remove unrunnable thread
-        lua_pushliteral(L, "th");
-        lua_pushnil(L);
-        lua_rawset(L, 1);
+        r->th = NULL;
+        luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+        r->ref_th = LUA_NOREF;
 
         // return done=true, error_code
         lua_settop(L, 0);
@@ -252,12 +195,11 @@ SET_ENTRYFN:
 
 static int results_lua(lua_State *L)
 {
-    checkself(L);
-    lua_State *res = rawget_thread(L, 1, "res", 0);
-    int nres       = lua_gettop(res);
+    reco_t *r = luaL_checkudata(L, 1, MODULE_MT);
+    int nres  = lua_gettop(r->res);
 
     if (nres) {
-        lua_xmove(res, L, nres);
+        lua_xmove(r->res, L, nres);
     }
 
     return nres;
@@ -265,53 +207,66 @@ static int results_lua(lua_State *L)
 
 static int reset_lua(lua_State *L)
 {
-    checkself(L);
+    reco_t *r = luaL_checkudata(L, 1, MODULE_MT);
 
     // replace function
     if (lua_gettop(L) > 1) {
         luaL_checktype(L, 2, LUA_TFUNCTION);
         lua_settop(L, 2);
-        lua_pushliteral(L, "fn");
-        lua_pushvalue(L, 2);
-        lua_rawset(L, 1);
+        luaL_unref(L, LUA_REGISTRYINDEX, r->ref_fn);
+        r->ref_fn = luaL_ref(L, LUA_REGISTRYINDEX);
     }
     // create new execution thread
-    lua_pushliteral(L, "th");
-    lua_newthread(L);
-    lua_rawset(L, 1);
+    luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+    r->th     = lua_newthread(L);
+    r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
 
     return 0;
 }
 
 static int tostring_lua(lua_State *L)
 {
-    checkself(L);
     lua_pushfstring(L, MODULE_MT ": %p", lua_topointer(L, 1));
     return 1;
 }
 
+static int gc_lua(lua_State *L)
+{
+    reco_t *r = luaL_checkudata(L, 1, MODULE_MT);
+
+    // unref function, execution thread and response thread
+    luaL_unref(L, LUA_REGISTRYINDEX, r->ref_fn);
+    luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+    luaL_unref(L, LUA_REGISTRYINDEX, r->ref_res);
+
+    return 0;
+}
+
 static int new_lua(lua_State *L)
 {
+    reco_t *r = NULL;
+
     luaL_checktype(L, 1, LUA_TFUNCTION);
     lua_settop(L, 1);
 
-    lua_createtable(L, 0, 3);
-    // set function
-    lua_pushliteral(L, "fn");
-    lua_pushvalue(L, 1);
-    lua_rawset(L, -3);
-    // create new execution thread
-    lua_pushliteral(L, "th");
-    lua_newthread(L);
-    lua_rawset(L, -3);
-    // response thread
-    lua_pushliteral(L, "res");
-    lua_newthread(L);
-    lua_rawset(L, -3);
-
-    // set metatable
+    r  = lua_newuserdata(L, sizeof(reco_t));
+    *r = (reco_t){
+        .ref_fn  = LUA_NOREF,
+        .ref_th  = LUA_NOREF,
+        .ref_res = LUA_NOREF,
+    };
     luaL_getmetatable(L, MODULE_MT);
     lua_setmetatable(L, -2);
+    lua_insert(L, 1);
+
+    // set function
+    r->ref_fn  = luaL_ref(L, LUA_REGISTRYINDEX);
+    // create new execution thread
+    r->th      = lua_newthread(L);
+    r->ref_th  = luaL_ref(L, LUA_REGISTRYINDEX);
+    // response thread
+    r->res     = lua_newthread(L);
+    r->ref_res = luaL_ref(L, LUA_REGISTRYINDEX);
 
     return 1;
 }
@@ -321,8 +276,9 @@ LUALIB_API int luaopen_reco(lua_State *L)
     // create table __metatable
     if (luaL_newmetatable(L, MODULE_MT)) {
         struct luaL_Reg mmethod[] = {
-            {"__call",     call_lua    },
+            {"__gc",       gc_lua      },
             {"__tostring", tostring_lua},
+            {"__call",     call_lua    },
             {NULL,         NULL        }
         };
         struct luaL_Reg method[] = {

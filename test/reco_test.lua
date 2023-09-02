@@ -33,6 +33,17 @@ function testcase.reset()
         'bar',
     })
 
+    -- test that returns values from return
+    done, rc = co()
+    assert.is_true(done)
+    assert.equal(rc, reco.OK)
+    assert.equal({
+        co:results(),
+    }, {
+        'baz',
+        'qux',
+    })
+
     -- test that reset internal coroutine
     co:reset()
     done, rc = co()
@@ -83,9 +94,15 @@ function testcase.call_results()
     assert.is_nil(co:results())
 
     -- test that returns ERRRUN
-    co.fn = function()
+    co = assert(reco.new(function()
         return {} + 1
-    end
+    end))
+    done, rc = co()
+    assert.is_true(done)
+    assert.equal(rc, reco.ERRRUN)
+    assert.match(co:results(), 'stack traceback:')
+
+    -- test that can be called multiple times
     done, rc = co()
     assert.is_true(done)
     assert.equal(rc, reco.ERRRUN)
