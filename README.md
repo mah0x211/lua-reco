@@ -24,16 +24,7 @@ luarocks install reco
 - reco.ERRFILE (`if defined`)
 
 
-## Create and reset an instance of reco
-
-```lua
-local reco = require('reco')
-local co = assert(reco.new(function()
-    print('hello')
-end))
-```
-
-### co, err = reco.new( fn )
+## co, err = reco.new( fn )
 
 create a new reusable coroutine object.
 
@@ -47,18 +38,16 @@ create a new reusable coroutine object.
 - `err:str`: error string. 
 
 
-### co:reset( [fn] )
+## co:reset( [fn] )
 
-replaces the function with the passed function and creates a new coroutine.
+replaces the function with the passed function if it is not nil. and recreates the coroutine.
 
 **Parameters**
 
 - `fn:function`: function that run in coroutine.
 
 
-## Execution and return values
-
-### done, status = co( ... )
+## done, status = co( ... )
 
 starts or continues the execution of coroutine.
 
@@ -72,7 +61,21 @@ starts or continues the execution of coroutine.
 - `status:integer`: status code.
 
 
-### ... = co:results()
+### info = co:getinfo( [level], [what] )
+
+get the debug information about `co`.
+
+**Parameters**
+
+- `level:integer`: stack level that same as `debug.getinfo` function. default is `1`.
+- `what:string`: same as `debug.getinfo` function. default is `'nSlutr'`.
+
+**Returns**
+
+- `info:table`: debug information or `nil`.
+
+
+## ... = co:results()
 
 get the return values. these values will be removed from `co`.
 

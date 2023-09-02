@@ -121,6 +121,7 @@ CREATE_NEWTHREAD:
     case LUA_OK:
 SET_ENTRYFN:
         // push function and arguments
+        lua_settop(r->th, 0);
         lua_rawgeti(L, LUA_REGISTRYINDEX, r->ref_fn);
         lua_xmove(L, r->th, 1);
         lua_xmove(L, r->th, argc);
@@ -180,11 +181,6 @@ SET_ENTRYFN:
         // push stacktrace to res thread
         traceback(r->res, r->th);
 
-        // remove unrunnable thread
-        r->th = NULL;
-        luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
-        r->ref_th = LUA_NOREF;
-
         // return done=true, error_code
         lua_settop(L, 0);
         lua_pushboolean(L, 1);
@@ -220,6 +216,75 @@ static int reset_lua(lua_State *L)
     luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
     r->th     = lua_newthread(L);
     r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    return 0;
+}
+
+static int getinfo_lua(lua_State *L)
+{
+    reco_t *r         = luaL_checkudata(L, 1, MODULE_MT);
+    lua_Integer level = luaL_optinteger(L, 2, 1);
+    const char *what  = luaL_optstring(L, 3, "nSlutr");
+    lua_Debug ar;
+
+    // get info from execution thread
+    if (lua_getstack(r->th, level, &ar)) {
+#if LUA_VERSION_NUM >= 502
+        lua_getinfo(r->th, what, &ar);
+#else
+        lua_getinfo(r->th, what, &ar);
+#endif
+        lua_settop(L, 0);
+        // push all info to table
+        lua_createtable(L, 0, 10);
+
+#define push_string_field(L, field)                                            \
+    do {                                                                       \
+        if (ar.field) {                                                        \
+            lua_pushstring(L, ar.field);                                       \
+            lua_setfield(L, -2, #field);                                       \
+        }                                                                      \
+    } while (0)
+
+#define push_int_field(L, field)                                               \
+    do {                                                                       \
+        lua_pushinteger(L, ar.field);                                          \
+        lua_setfield(L, -2, #field);                                           \
+    } while (0)
+
+#define push_bool_field(L, field)                                              \
+    do {                                                                       \
+        lua_pushboolean(L, ar.field);                                          \
+        lua_setfield(L, -2, #field);                                           \
+    } while (0)
+
+        push_string_field(L, name);
+        push_string_field(L, namewhat);
+        push_string_field(L, what);
+        push_string_field(L, source);
+        push_string_field(L, short_src);
+        push_int_field(L, currentline);
+        push_int_field(L, linedefined);
+        push_int_field(L, lastlinedefined);
+        push_int_field(L, nups);
+
+#if LUA_VERSION_NUM >= 502
+        push_int_field(L, nparams);
+        push_bool_field(L, isvararg);
+        push_bool_field(L, istailcall);
+#endif
+
+#if LUA_VERSION_NUM >= 504
+        push_int_field(L, ftransfer);
+        push_int_field(L, ntransfer);
+#endif
+
+#undef push_bool_field
+#undef push_int_field
+#undef push_string_field
+
+        return 1;
+    }
 
     return 0;
 }
@@ -282,6 +347,7 @@ LUALIB_API int luaopen_reco(lua_State *L)
             {NULL,         NULL        }
         };
         struct luaL_Reg method[] = {
+            {"getinfo", getinfo_lua},
             {"reset",   reset_lua  },
             {"results", results_lua},
             {NULL,      NULL       }

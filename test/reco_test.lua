@@ -109,6 +109,49 @@ function testcase.call_results()
     assert.match(co:results(), 'stack traceback:')
 end
 
+function testcase.getinfo()
+    local fn = function()
+        coroutine.yield('foo', 1, {})
+        local a = {} + 1
+        return 'foo', 1, a, {}
+    end
+    local fninfo = debug.getinfo(fn)
+    local co = assert(reco.new(fn))
+    local done, rc = co()
+    assert.is_false(done)
+    assert.equal(rc, reco.YIELD)
+
+    -- test that get debug info of coroutine
+    local info = assert(co:getinfo())
+    assert.equal({
+        ftransfer = info.ftransfer,
+        istailcall = info.istailcall,
+        isvararg = info.isvararg,
+        lastlinedefined = info.lastlinedefined,
+        linedefined = info.linedefined,
+        namewhat = info.namewhat,
+        nparams = info.nparams,
+        ntransfer = info.ntransfer,
+        nups = info.nups,
+        short_src = info.short_src,
+        source = info.source,
+        what = info.what,
+    }, {
+        ftransfer = fninfo.ftransfer,
+        istailcall = fninfo.istailcall,
+        isvararg = fninfo.isvararg,
+        lastlinedefined = fninfo.lastlinedefined,
+        linedefined = fninfo.linedefined,
+        namewhat = fninfo.namewhat,
+        nparams = fninfo.nparams,
+        ntransfer = fninfo.ntransfer,
+        nups = fninfo.nups,
+        short_src = fninfo.short_src,
+        source = fninfo.source,
+        what = fninfo.what,
+    })
+end
+
 function testcase.throw_error()
     local co = assert(reco.new(function()
     end))
