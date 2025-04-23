@@ -107,19 +107,17 @@ static int call_lua(lua_State *L)
     // clear res thread
     lua_settop(r->res, 0);
 
-    // should create new thread
-    if (!r->th) {
-CREATE_NEWTHREAD:
-        // create new thread
-        r->th     = lua_newthread(L);
-        r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
-        goto SET_ENTRYFN;
-    }
-
     // get current status
     switch (lua_status(r->th)) {
+    default:
+        // if thread is dead, create new thread
+        luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+        r->ref_th = LUA_NOREF;
+        r->th     = lua_newthread(L);
+        r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
+        // fall through to restart thread
+
     case LUA_OK:
-SET_ENTRYFN:
         // push function and arguments
         lua_settop(r->th, 0);
         lua_rawgeti(L, LUA_REGISTRYINDEX, r->ref_fn);
@@ -131,9 +129,6 @@ SET_ENTRYFN:
         // push arguments if yield
         lua_xmove(L, r->th, argc);
         break;
-
-    default:
-        goto CREATE_NEWTHREAD;
     }
 
     // run thread
@@ -211,12 +206,16 @@ static int reset_lua(lua_State *L)
         luaL_checktype(L, 2, LUA_TFUNCTION);
         lua_settop(L, 2);
         luaL_unref(L, LUA_REGISTRYINDEX, r->ref_fn);
+        r->ref_fn = LUA_NOREF;
         r->ref_fn = luaL_ref(L, LUA_REGISTRYINDEX);
     }
     // create new execution thread
     luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+    r->ref_th = LUA_NOREF;
     r->th     = lua_newthread(L);
     r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
+    // clear response thread stack
+    lua_settop(r->res, 0);
 
     return 0;
 }
@@ -225,16 +224,18 @@ static int getinfo_lua(lua_State *L)
 {
     reco_t *r         = luaL_checkudata(L, 1, MODULE_MT);
     lua_Integer level = luaL_optinteger(L, 2, 1);
+    // select info fields:
+    //  n: name and namewhat
+    //  S: source, short_src, linedefined, lastlinedefined and what
+    //  l: currentline
+    //  u: nups, nparams, isvararg
+    //  t: istailcall
     const char *what  = luaL_optstring(L, 3, "nSlutr");
     lua_Debug ar;
 
     // get info from execution thread
     if (lua_getstack(r->th, level, &ar)) {
-#if LUA_VERSION_NUM >= 502
         lua_getinfo(r->th, what, &ar);
-#else
-        lua_getinfo(r->th, what, &ar);
-#endif
         lua_settop(L, 0);
         // push all info to table
         lua_createtable(L, 0, 10);
@@ -286,7 +287,6 @@ static int getinfo_lua(lua_State *L)
 
 #if LUA_VERSION_NUM >= 502
         if (strchr(what, 't')) {
-            push_bool_field(L, istailcall);
             push_bool_field(L, istailcall);
         }
 #endif

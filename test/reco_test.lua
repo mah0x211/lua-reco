@@ -123,8 +123,17 @@ function testcase.getinfo()
     assert.is_false(done)
     assert.equal(rc, reco.YIELD)
 
+    -- NOTE: Lua 5.1 doesn't support isvararg and nparams,
+    -- but, in LuaJIT, it sets isvararg to false and nparams to 0.
+    -- So, we need to set them to nil for Lua 5.1
+    if (_VERSION or ''):find('5.1', nil, true) then
+        fninfo.isvararg = nil
+        fninfo.nparams = nil
+    end
+
     -- test that get debug info of coroutine
     local info = assert(co:getinfo())
+
     assert.equal({
         ftransfer = info.ftransfer,
         istailcall = info.istailcall,

@@ -1,6 +1,10 @@
 name: test
 
-on: [push]
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
 
 jobs:
   test:
@@ -8,10 +12,11 @@ jobs:
     strategy:
       matrix:
         lua-version:
-          - "5.1"
-          - "5.2"
-          - "5.3"
-          - "5.4"
+          - "5.1.:latest"
+          - "5.2.:latest"
+          - "5.3.:latest"
+          - "5.4.:latest"
+          - "lj-v2.1:latest"
 
     steps:
     -
@@ -21,12 +26,9 @@ jobs:
         submodules: 'true'
     -
       name: Setup Lua ${{ matrix.lua-version }}
-      uses: leafo/gh-actions-lua@v10
+      uses: mah0x211/setup-lua@v1
       with:
-        luaVersion: ${{ matrix.lua-version }}
-    -
-      name: Setup Luarocks
-      uses: leafo/gh-actions-luarocks@v4
+        versions: ${{ matrix.lua-version }}
     -
       name: Install Tools
       run: |
@@ -46,6 +48,7 @@ jobs:
         sh ./covgen.sh
     -
       name: Upload C coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         flags: unittests
