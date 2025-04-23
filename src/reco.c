@@ -211,10 +211,12 @@ static int reset_lua(lua_State *L)
         luaL_checktype(L, 2, LUA_TFUNCTION);
         lua_settop(L, 2);
         luaL_unref(L, LUA_REGISTRYINDEX, r->ref_fn);
+        r->ref_fn = LUA_NOREF;
         r->ref_fn = luaL_ref(L, LUA_REGISTRYINDEX);
     }
     // create new execution thread
     luaL_unref(L, LUA_REGISTRYINDEX, r->ref_th);
+    r->ref_th = LUA_NOREF;
     r->th     = lua_newthread(L);
     r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
 
