@@ -1,7 +1,7 @@
 package = "reco"
 version = "scm-1"
 source = {
-    url = "git://github.com/mah0x211/lua-reco.git",
+    url = "git+https://github.com/mah0x211/lua-reco.git",
 }
 description = {
     summary = "reusable coroutine module",
