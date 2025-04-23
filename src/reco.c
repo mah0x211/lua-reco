@@ -219,6 +219,8 @@ static int reset_lua(lua_State *L)
     r->ref_th = LUA_NOREF;
     r->th     = lua_newthread(L);
     r->ref_th = luaL_ref(L, LUA_REGISTRYINDEX);
+    // clear response thread stack
+    lua_settop(r->res, 0);
 
     return 0;
 }
