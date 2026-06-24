@@ -7,8 +7,27 @@ on:
       - 'LICENSE'
 
 jobs:
-  test:
+  luacheck:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/mah0x211/lua-ci:latest
+    steps:
+    -
+      name: Checkout
+      uses: actions/checkout@v2
+    -
+      name: Install Tools
+      run: luarocks install luacheck
+    -
+      name: Run luacheck
+      run: |
+        luacheck .
+
+  test:
+    needs: luacheck
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/mah0x211/lua-ci:latest
     strategy:
       matrix:
         lua-version:
@@ -17,31 +36,27 @@ jobs:
           - "5.3.:latest"
           - "5.4.:latest"
           - "lj-v2.1:latest"
-
     steps:
+    -
+      name: Switch Lua Version
+      run: |
+        lenv -g use ${{ matrix.lua-version }}
+        lua -v || true
     -
       name: Checkout
       uses: actions/checkout@v2
-      with:
-        submodules: 'true'
-    -
-      name: Setup Lua ${{ matrix.lua-version }}
-      uses: mah0x211/setup-lua@v1
-      with:
-        versions: ${{ matrix.lua-version }}
-    -
-      name: Install Tools
-      run: |
-        sudo apt install lcov -y
-        luarocks install testcase
     -
       name: Install
       run: |
-        luarocks make RECO_COVERAGE=1
+        RECO_COVERAGE=1 luarocks make
+    -
+      name: Install Tools
+      run: |
+        luarocks install testcase
     -
       name: Run Test
       run: |
-        testcase ./test
+        testcase ./test/
     -
       name: Generate coverage reports
       run: |
@@ -51,4 +66,5 @@ jobs:
       uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage/lcov.info
         flags: unittests
