@@ -25,13 +25,14 @@
  *
  */
 
+// lua
+#include <lauxlib.h>
+
+// system
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-// lua
-#include <lauxlib.h>
-#include <lua.h>
 
 #ifndef LUA_OK
 # define LUA_OK 0
